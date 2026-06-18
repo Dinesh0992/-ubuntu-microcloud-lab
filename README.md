@@ -1,7 +1,7 @@
 # Ubuntu MicroCloud Learning Lab
 
-**Status:** Architecture Pivot Complete → Single-Node LXD Hypervisor Operational  
-**Last Updated:** June 16, 2026  
+**Status:** Architecture Pivot Complete → Single-Node LXD Hypervisor + Desktop VM Operational  
+**Last Updated:** June 18, 2026  
 **Hardware:** AMD FX-8350 Bare-Metal Server  
 **Network:** `enp3s0` @ `192.168.1.7` / `192.168.1.8`  
 **Orchestration:** LXD (Non-Clustered) + HTTPS Dashboard (`:8443`)
@@ -20,6 +20,7 @@ This repository documents a home lab learning journey for **microservice distrib
 | **Jun 12** | Migrated SSD from SATA III → SATA II (Port 4) | Legacy AMD SB950 chipset timing desync with NCQ caused `ata5.00` freezes |
 | **Jun 16** | Injected missing `admins` RBAC group into LXD | LXD build lacked pre-configured admin group, blocking TLS trust token validation |
 | **Jun 16** | Deployed `lab-node1` (Ubuntu 24.04) | Verified LXD engine provisioning mechanics end-to-end |
+| **Jun 18** | Deployed `lab-desktop` (Debian 12 VM + LXDE) | Lightweight remote desktop for server management via RDP |
 
 ---
 
@@ -44,6 +45,13 @@ This repository documents a home lab learning journey for **microservice distrib
 - **UI Access:** Browser authenticated instantly at `https://192.168.1.7:8443` (dark mode)
 - **Workload Test:** `sudo lxc launch ubuntu:24.04 lab-node1` → RUNNING, IP acquired, visible in dashboard
 
+### June 18, 2026 — Lightweight Desktop VM (Debian 12 + LXDE)
+- **VM Launch:** Deployed `lab-desktop` as LXD VM from `images:debian/12`
+- **Desktop:** Installed LXDE + xrdp for remote desktop access
+- **RAM Target:** ~350 MB idle — suitable for single-server environment
+- **Remote Access:** SSH tunnel (`localhost:3390` → VM port 3389) verified working
+- **Status:** VM RUNNING, RDP accessible via tunnel
+
 ---
 
 ## Current System State
@@ -58,6 +66,7 @@ This repository documents a home lab learning journey for **microservice distrib
 │  Dashboard:    https://192.168.1.7:8443 (TLS client cert)   │
 │  Auth:         admins group + tls/lxd-ui identity ✓         │
 │  Containers:   lab-node1 (ubuntu:24.04) — RUNNING           │
+│  VMs:          lab-desktop (debian:12 + LXDE) — RUNNING     │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -81,7 +90,7 @@ lxc auth identity create tls/lxd-ui --group admins
 
 ### Container Lifecycle
 ```bash
-# Launch workload
+# Launch workload (container)
 sudo lxc launch ubuntu:24.04 <name>
 
 # Execute into container
@@ -92,6 +101,35 @@ sudo lxc list
 
 # Stop all containers gracefully
 sudo lxc stop --all
+```
+
+### VM Lifecycle
+```bash
+# Launch a VM (add --vm flag)
+sudo lxc launch images:debian/12 --vm <name>
+
+# Set CPU/memory limits
+sudo lxc config set <name> limits.cpu 2
+sudo lxc config set <name> limits.memory 2GiB
+
+# Execute commands inside VM
+sudo lxc exec <name> -- bash -c "apt update && apt install -y lxde"
+
+# Get VM IP address
+sudo lxc list | grep <name>
+
+# Switch VM to bridged mode (LAN IP instead of NAT)
+sudo lxc stop <name>
+sudo lxc config device add <name> eth0 nic nictype=bridged parent=lxdbr0
+sudo lxc start <name>
+```
+
+### Remote Desktop (SSH Tunnel)
+```bash
+# Tunnel RDP through SSH to a NAT'd VM
+ssh -L 3390:<vm-ip>:3389 user@192.168.1.7
+
+# Then connect Windows RDP (mstsc) to 127.0.0.1:3390
 ```
 
 ### Network Diagnostics
@@ -127,7 +165,8 @@ sudo shutdown -h now
 - [x] MicroCloud → LXD pivot
 - [x] LXD TLS/RBAC configuration
 - [x] Dashboard access verified
-- [x] Base container deployment verified
+- [x] Base container deployment verified (lab-node1)
+- [x] Desktop VM deployment verified (lab-desktop, Debian 12 + LXDE)
 
 ### Phase 2: Microservice Infrastructure (NEXT)
 - [ ] Deploy microservice containers (API gateway, services, databases)
@@ -163,6 +202,9 @@ sudo shutdown -h now
 
 ### LXD UI with lab-node1 Running
 ![LXD UI with lab-node1](Images/LxDUIWithUbuntulab-node1.png)
+
+### Debian 12 VM with LXDE Desktop
+![Debian VM Desktop](Images/debianVMIsntancewithDesktop.png)
 
 ---
 
