@@ -1,7 +1,7 @@
 # Ubuntu MicroCloud Learning Lab
 
-**Status:** Architecture Pivot Complete → Single-Node LXD Hypervisor + Desktop VM Operational  
-**Last Updated:** June 18, 2026  
+**Status:** Architecture Pivot Complete → Single-Node LXD Hypervisor + Gitea Self-Hosted Git Service  
+**Last Updated:** June 19, 2026  
 **Hardware:** AMD FX-8350 Bare-Metal Server  
 **Network:** `enp3s0` @ `192.168.1.7` / `192.168.1.8`  
 **Orchestration:** LXD (Non-Clustered) + HTTPS Dashboard (`:8443`)
@@ -21,6 +21,7 @@ This repository documents a home lab learning journey for **microservice distrib
 | **Jun 16** | Injected missing `admins` RBAC group into LXD | LXD build lacked pre-configured admin group, blocking TLS trust token validation |
 | **Jun 16** | Deployed `lab-node1` (Ubuntu 24.04) | Verified LXD engine provisioning mechanics end-to-end |
 | **Jun 18** | Deployed `lab-desktop` (Debian 12 VM + LXDE) | Lightweight remote desktop for server management via RDP |
+| **Jun 19** | Installed Gitea on `lab-node1` (native binary + SQLite) | Self-hosted Git service (analogous to Azure Repos / GitHub) for microservice source control |
 
 ---
 
@@ -52,6 +53,20 @@ This repository documents a home lab learning journey for **microservice distrib
 - **Remote Access:** SSH tunnel (`localhost:3390` → VM port 3389) verified working
 - **Status:** VM RUNNING, RDP accessible via tunnel
 
+### June 19, 2026 — Gitea Self-Hosted Git Service (Azure Repos / GitHub Analogue)
+- **Container:** `lab-node1` (Ubuntu 24.04)
+- **Installation:** Native Go binary (v1.22.3) + SQLite3 — no Docker overhead
+- **Systemd Service:** Gitea runs as `git` user, auto-starts on boot
+- **Database:** SQLite3 at `/var/lib/gitea/data/gitea.db`
+- **UI:** Accessible at `http://192.168.1.7:3000`
+- **Admin User:** `dineshviswes` (admin privileges confirmed via SQLite query)
+- **LXD Proxy:** Port 3000 forwarded from container → host → LAN
+- **Issues Faced & Resolved:**
+  - ✅ Gitea binary's default `WorkPath` was `/usr/local/bin` (binary location) — fixed by adding `--work-path /var/lib/gitea` to systemd `ExecStart`
+  - ✅ Web installer defaulted to MySQL (port 3306) since no SQLite config was present — fixed by pre-creating `app.ini` with `DB_TYPE = sqlite3` or selecting SQLite3 in the installer
+  - ✅ LXD proxy device initially used `connect=tcp:127.0.0.1:3000` but containers have their own network namespace — fixed by pointing to container IP `10.228.135.33:3000`
+  - ✅ Stale 0-byte `gitea.db` owned by `root` blocked the real database creation — cleaned up with `rm -f` and proper `chown git:git`
+
 ---
 
 ## Current System State
@@ -65,14 +80,59 @@ This repository documents a home lab learning journey for **microservice distrib
 │  Hypervisor:   LXD 5.x (non-clustered, snap)                │
 │  Dashboard:    https://192.168.1.7:8443 (TLS client cert)   │
 │  Auth:         admins group + tls/lxd-ui identity ✓         │
-│  Containers:   lab-node1 (ubuntu:24.04) — RUNNING           │
-│  VMs:          lab-desktop (debian:12 + LXDE) — RUNNING     │
+│  Containers:   lab-node1 (ubuntu:24.04) — STOPPED           │
+│                └─ Gitea v1.22.3 @ :3000                     │
+│  VMs:          lab-desktop (debian:12 + LXDE) — STOPPED     │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
 ## Quick Reference: Operational Commands
+
+### Gitea Service (Self-Hosted Git)
+
+```bash
+# Install Gitea (inside lab-node1 container)
+sudo lxc exec lab-node1 bash
+apt update && apt install -y git curl sqlite3
+adduser --system --group --disabled-password --shell /bin/bash --home /home/git git
+mkdir -p /var/lib/gitea/{custom,data,log}
+chown -R git:git /var/lib/gitea && chmod -R 750 /var/lib/gitea
+mkdir -p /etc/gitea && chown root:git /etc/gitea && chmod 770 /etc/gitea
+wget -O /usr/local/bin/gitea https://dl.gitea.com/gitea/1.22.3/gitea-1.22.3-linux-amd64
+chmod +x /usr/local/bin/gitea
+
+# Systemd service
+cat > /etc/systemd/system/gitea.service << 'EOF'
+[Unit]
+Description=Gitea (Git with a cup of tea)
+After=network.target
+[Service]
+ExecStart=/usr/local/bin/gitea web --config /etc/gitea/app.ini --work-path /var/lib/gitea
+Restart=always
+User=git
+Group=git
+WorkingDirectory=/var/lib/gitea
+Type=simple
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload && systemctl enable --now gitea
+
+# Expose via LXD proxy (from host)
+sudo lxc config device add lab-node1 gitea-port proxy listen=tcp:0.0.0.0:3000 connect=tcp:<container-ip>:3000
+
+# Verify
+sudo lxc exec lab-node1 -- sqlite3 /var/lib/gitea/data/gitea.db "SELECT id, name, email, is_admin FROM user;"
+
+# Stop / Start / Restart
+sudo lxc exec lab-node1 -- systemctl stop gitea
+sudo lxc exec lab-node1 -- systemctl start gitea
+sudo lxc exec lab-node1 -- systemctl restart gitea
+sudo lxc exec lab-node1 -- systemctl status gitea
+```
 
 ### LXD Administration
 ```bash
@@ -146,15 +206,36 @@ ping -c 3 192.168.1.1
 
 ### Graceful Lab Teardown (Runbook)
 ```bash
-# 1. Halt all workloads (unmount FS, stop daemons)
+# 1. Stop Gitea service cleanly (flushes DB, closes connections)
+sudo lxc exec lab-node1 -- systemctl stop gitea
+
+# 2. Halt all LXD workloads
 sudo lxc stop --all
 
-# 2. Verify zero active instances
+# 3. Verify zero active instances
 sudo lxc list
 
-# 3. Power down physical host
+# 4. Power down physical host
 sudo shutdown -h now
 ```
+
+### Server Restart — Services Auto-Recovery
+```bash
+# 1. Power on server — LXD starts automatically on boot
+# 2. Start lab-node1 container
+sudo lxc start lab-node1
+
+# 3. Gitea systemd service inside container auto-starts (enabled)
+#    Check status:
+sudo lxc exec lab-node1 -- systemctl status gitea
+
+# 4. Optional: make container auto-start on host boot
+sudo lxc config set lab-node1 boot.autostart true
+
+# 5. Open browser → http://192.168.1.7:3000 — all data intact
+```
+
+> **Tip:** After setting `boot.autostart true` on `lab-node1`, the full stack (LXD → container → Gitea) comes up automatically after a server power cycle. No manual steps needed.
 
 ---
 
@@ -168,17 +249,24 @@ sudo shutdown -h now
 - [x] Base container deployment verified (lab-node1)
 - [x] Desktop VM deployment verified (lab-desktop, Debian 12 + LXDE)
 
-### Phase 2: Microservice Infrastructure (NEXT)
+### Phase 2: Self-Hosted DevOps Platform (NEXT)
+- [x] Gitea on `lab-node1` — self-hosted Git service (Azure Repos / GitHub analogue)
+- [ ] **Docker Registry** on `lab-desktop` — private container image registry (Azure Container Registry analogue)
 - [ ] Deploy microservice containers (API gateway, services, databases)
 - [ ] Configure service discovery & load balancing
 - [ ] Implement inter-service communication (gRPC/REST)
 
-### Phase 3: Distributed Systems Patterns
+### Phase 3: Container Orchestration
+- [ ] Set up lightweight Kubernetes (K3s / MicroK8s) — AKS analogue
+- [ ] Deploy workloads to the cluster
+- [ ] Configure ingress, scaling, monitoring
+
+### Phase 4: Distributed Systems Patterns
 - [ ] Design distributed transactions & eventual consistency
 - [ ] Implement circuit breakers, retries, timeouts
 - [ ] Test failure scenarios & resilience patterns
 
-### Phase 4: Observability & Resilience
+### Phase 5: Observability & Resilience
 - [ ] Add Prometheus/Grafana stack
 - [ ] Configure structured logging
 - [ ] Chaos testing (container kill, network partition)
@@ -192,19 +280,26 @@ sudo shutdown -h now
 | `Consolidated_Engineering_Log_2026-06-12.md` | End-of-day summary: hardware fix, snap purge, LXD pivot |
 | `Full_Day_Analysis_2026-06-12.md` | Detailed RCA: `ata5.00` freezes, dqlite corruption, AppArmor loops |
 | `Simplifying your distributed cloud infrastructure with MicroCloud.md` | Canonical whitepaper (Q4 2024) — MicroCloud architecture & deployment guide |
+| `README.md` (this file) | Living document — lab state, commands, roadmap, screenshots |
 
 ---
 
-## Dashboard Screenshots
+## Screenshots
 
-### Initial LXD UI State
-![LXD UI Initial State](Images/LxdUIStartInitial.png)
+### LXD Dashboard
 
-### LXD UI with lab-node1 Running
-![LXD UI with lab-node1](Images/LxDUIWithUbuntulab-node1.png)
+| Initial State | lab-node1 Running |
+|:---:|:---:|
+| ![LXD UI Initial](Images/LxdUIStartInitial.png) | ![LXD UI with lab-node1](Images/LxDUIWithUbuntulab-node1.png) |
 
-### Debian 12 VM with LXDE Desktop
+### Debian 12 VM Desktop
 ![Debian VM Desktop](Images/debianVMIsntancewithDesktop.png)
+
+### Gitea on lab-node1 (`http://192.168.1.7:3000`)
+
+| Install Page | Install Config | Sign-In | Dashboard |
+|:---:|:---:|:---:|:---:|
+| ![Gitea Install](Images/GiteaInstallPage.png) | ![Gitea Install 2](Images/GiteaInstallPage2.png) | ![Gitea Sign-In](Images/giteasigninPage.png) | ![Gitea After Sign-In](Images/GiteaAfterSiginEntryPage.png) |
 
 ---
 
