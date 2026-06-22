@@ -205,9 +205,36 @@ sudo nano /etc/netplan/00-installer-config.yaml
 #     addresses: [8.8.8.8, 1.1.1.1]
 sudo netplan apply
 
-# Verify
-ip addr show enp3s0 | grep inet
+# Verify static IP & default route
+ip addr show enp3s0
 # Expected: inet 192.168.1.7/24 ... valid_lft forever preferred_lft forever
+ip route show default
+# Expected: default via 192.168.1.1 dev enp3s0 proto static
+```
+
+### SSH Access & Troubleshooting
+```bash
+# Check SSH server status
+sudo systemctl status ssh
+sudo systemctl start ssh
+sudo systemctl enable ssh
+
+# Find your IP and username
+hostname -I
+whoami
+
+# Check if password authentication is enabled
+sudo grep PasswordAuthentication /etc/ssh/sshd_config
+
+# Enable password auth if disabled
+sudo sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
+sudo systemctl restart ssh
+
+# Debug connection issues (run from client)
+ssh -v user@192.168.1.7
+
+# Reset user password
+passwd
 ```
 
 ### Network Diagnostics
