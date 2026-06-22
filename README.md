@@ -1,7 +1,7 @@
 # Ubuntu MicroCloud Learning Lab
 
 **Status:** Architecture Pivot Complete → Single-Node LXD Hypervisor + Gitea Self-Hosted Git Service  
-**Last Updated:** June 19, 2026  
+**Last Updated:** June 22, 2026  
 **Hardware:** AMD FX-8350 Bare-Metal Server  
 **Network:** `enp3s0` @ `192.168.1.7` / `192.168.1.8`  
 **Orchestration:** LXD (Non-Clustered) + HTTPS Dashboard (`:8443`)
@@ -22,6 +22,7 @@ This repository documents a home lab learning journey for **microservice distrib
 | **Jun 16** | Deployed `lab-node1` (Ubuntu 24.04) | Verified LXD engine provisioning mechanics end-to-end |
 | **Jun 18** | Deployed `lab-desktop` (Debian 12 VM + LXDE) | Lightweight remote desktop for server management via RDP |
 | **Jun 19** | Installed Gitea on `lab-node1` (native binary + SQLite) | Self-hosted Git service (analogous to Azure Repos / GitHub) for microservice source control |
+| **Jun 22** | Static IP configured on `enp3s0` via Netplan | DHCP changed IP from `.7` to `.4`; locked `192.168.1.7` permanently with Netplan + `networkd` |
 
 ---
 
@@ -190,6 +191,23 @@ sudo lxc start <name>
 ssh -L 3390:<vm-ip>:3389 user@192.168.1.7
 
 # Then connect Windows RDP (mstsc) to 127.0.0.1:3390
+```
+
+### Network Configuration (Static IP)
+```bash
+# Set static IP via Netplan (renderer: networkd)
+sudo nano /etc/netplan/00-installer-config.yaml
+#   addresses: [192.168.1.7/24]
+#   routes:
+#     - to: default
+#       via: 192.168.1.1
+#   nameservers:
+#     addresses: [8.8.8.8, 1.1.1.1]
+sudo netplan apply
+
+# Verify
+ip addr show enp3s0 | grep inet
+# Expected: inet 192.168.1.7/24 ... valid_lft forever preferred_lft forever
 ```
 
 ### Network Diagnostics
