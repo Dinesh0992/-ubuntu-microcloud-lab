@@ -1,7 +1,7 @@
 # Ubuntu MicroCloud Learning Lab
 
 **Status:** Architecture Pivot Complete → Single-Node LXD Hypervisor + Gitea Self-Hosted Git Service  
-**Last Updated:** June 22, 2026  
+**Last Updated:** June 24, 2026  
 **Hardware:** AMD FX-8350 Bare-Metal Server  
 **Network:** `enp3s0` @ `192.168.1.7` / `192.168.1.8`  
 **Orchestration:** LXD (Non-Clustered) + HTTPS Dashboard (`:8443`)
@@ -23,6 +23,7 @@ This repository documents a home lab learning journey for **microservice distrib
 | **Jun 18** | Deployed `lab-desktop` (Debian 12 VM + LXDE) | Lightweight remote desktop for server management via RDP |
 | **Jun 19** | Installed Gitea on `lab-node1` (native binary + SQLite) | Self-hosted Git service (analogous to Azure Repos / GitHub) for microservice source control |
 | **Jun 22** | Static IP configured on `enp3s0` via Netplan | DHCP changed IP from `.7` to `.4`; locked `192.168.1.7` permanently with Netplan + `networkd` |
+| **Jun 24** | Docker Registry planning on `lab-desktop` | VM networking issue (`enp5s0` ARP fails for external IPs, containers unaffected) — decided to use a new LXD container instead |
 
 ---
 
@@ -84,6 +85,8 @@ This repository documents a home lab learning journey for **microservice distrib
 │  Containers:   lab-node1 (ubuntu:24.04) — STOPPED           │
 │                └─ Gitea v1.22.3 @ :3000                     │
 │  VMs:          lab-desktop (debian:12 + LXDE) — STOPPED     │
+│                ⚠ VM networking: enp5s0 ARP failure on       │
+│                  external IPs, only gateway reachable        │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -296,7 +299,9 @@ sudo lxc config set lab-node1 boot.autostart true
 
 ### Phase 2: Self-Hosted DevOps Platform (NEXT)
 - [x] Gitea on `lab-node1` — self-hosted Git service (Azure Repos / GitHub analogue)
-- [ ] **Docker Registry** on `lab-desktop` — private container image registry (Azure Container Registry analogue)
+- [~] **Docker Registry** — planning phase (Jun 24)
+  - VM networking issue on `lab-desktop` → pivot to new LXD container
+  - Next: create container, install Docker registry (ACR analogue)
 - [ ] Deploy microservice containers (API gateway, services, databases)
 - [ ] Configure service discovery & load balancing
 - [ ] Implement inter-service communication (gRPC/REST)
