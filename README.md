@@ -516,7 +516,7 @@ sudo lxc config set lab-registry boot.autostart true
 
 ### Registry UI on lab-registry (`http://192.168.1.7:8080`)
 
-> *(Screenshot placeholder — add when available)*
+![Docker Registry UI](Images/DockerRegistryUI.png)
 
 ---
 
