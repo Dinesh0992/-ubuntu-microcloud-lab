@@ -508,6 +508,16 @@ sudo lxc config set lab-registry boot.autostart true
 |:---:|:---:|:---:|:---:|
 | ![Gitea Install](Images/GiteaInstallPage.png) | ![Gitea Install 2](Images/GiteaInstallPage2.png) | ![Gitea Sign-In](Images/giteasigninPage.png) | ![Gitea After Sign-In](Images/GiteaAfterSiginEntryPage.png) |
 
+### Portainer CE on lab-registry (`http://192.168.1.7:9000`)
+
+| Admin Registration | Dashboard |
+|:---:|:---:|
+| ![Portainer Admin Register](Images/portainerAdminRegisterPage.png) | ![Portainer Dashboard](Images/PortainerDashboard.png) |
+
+### Registry UI on lab-registry (`http://192.168.1.7:8080`)
+
+> *(Screenshot placeholder — add when available)*
+
 ---
 
 ## Why Not MicroCloud?
