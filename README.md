@@ -1,7 +1,7 @@
 # Ubuntu MicroCloud Learning Lab
 
 **Status:** Architecture Pivot Complete → Single-Node LXD Hypervisor + Gitea + Docker Registry + Portainer  
-**Last Updated:** June 25, 2026  
+**Last Updated:** June 28, 2026  
 **Hardware:** AMD FX-8350 Bare-Metal Server  
 **Network:** `enp3s0` @ `192.168.1.7` / `192.168.1.8`  
 **Orchestration:** LXD (Non-Clustered) + HTTPS Dashboard (`:8443`)
@@ -112,6 +112,24 @@ This repository documents a home lab learning journey for **microservice distrib
 │                  external IPs, only gateway reachable        │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## CI/CD Pipeline — .NET Web API (In Progress)
+
+### Goal
+End-to-end test environment: local code → Gitea → CI build → Docker image → registry → deploy
+
+### Progress — June 28, 2026
+
+- [x] Created `MyWebApi` .NET Web API project
+- [x] Created `my-web-api` repo on Gitea (`http://192.168.1.7:3000/dineshviswes/my-web-api`)
+- [x] Pushed initial code to Gitea (`main` branch)
+- [ ] Add Dockerfile to project
+- [ ] Set up Gitea Actions runner on lab server
+- [ ] Create CI workflow (build → test → docker build → push to registry)
+- [ ] Create `lab-test` LXD container for test deployment
+- [ ] Deploy image to test environment with automated rollback
 
 ---
 
