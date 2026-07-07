@@ -1,7 +1,7 @@
 # Ubuntu MicroCloud Learning Lab
 
 **Status:** Architecture Pivot Complete → Single-Node LXD Hypervisor + Gitea + Docker Registry + Portainer  
-**Last Updated:** June 28, 2026  
+**Last Updated:** July 7, 2026  
 **Hardware:** AMD FX-8350 Bare-Metal Server  
 **Network:** `enp3s0` @ `192.168.1.7` / `192.168.1.8`  
 **Orchestration:** LXD (Non-Clustered) + HTTPS Dashboard (`:8443`)
@@ -115,17 +115,53 @@ This repository documents a home lab learning journey for **microservice distrib
 
 ---
 
+### Today's Commands (July 7, 2026)
+
+```powershell
+# ---- On Windows (Docker Desktop) ----
+
+# Build the .NET Web API image
+docker build -t mywebapi .
+
+# List images to confirm
+docker images
+
+# Tag for local registry
+docker tag mywebapi 192.168.1.7:5000/mywebapi
+
+# Push to self-hosted registry
+docker push 192.168.1.7:5000/mywebapi
+
+# Verify registry catalog
+curl -k https://192.168.1.7:5000/v2/_catalog
+
+# ---- On Linux server (lab-registry container) ----
+
+# Check registry logs to verify push
+sudo lxc exec lab-registry -- docker logs registry
+
+# List stored images on registry server
+sudo lxc exec lab-registry -- ls /var/lib/registry/docker/registry/v2/repositories
+```
+
+> **Windows Docker Desktop — Two options to trust the registry:**
+> 1. **Insecure registry (used today):** Add `"insecure-registries": ["192.168.1.7:5000"]` to Docker Desktop → Settings → Docker Engine → Apply & Restart
+> 2. **Proper cert trust (ideal):** Import the server's `registry.crt` into Windows Trusted Root store (`Cert:\LocalMachine\Root`) — avoids disabling TLS verification but requires workaround for colon in Windows folder names
+
+---
+
 ## CI/CD Pipeline — .NET Web API (In Progress)
 
 ### Goal
 End-to-end test environment: local code → Gitea → CI build → Docker image → registry → deploy
 
-### Progress — June 28, 2026
+### Progress — July 7, 2026
 
 - [x] Created `MyWebApi` .NET Web API project
 - [x] Created `my-web-api` repo on Gitea (`http://192.168.1.7:3000/dineshviswes/my-web-api`)
 - [x] Pushed initial code to Gitea (`main` branch)
-- [ ] Add Dockerfile to project
+- [x] Added Dockerfile and built `mywebapi` image
+- [x] Pushed `mywebapi` image to Docker Registry (`192.168.1.7:5000`)
 - [ ] Set up Gitea Actions runner on lab server
 - [ ] Create CI workflow (build → test → docker build → push to registry)
 - [ ] Create `lab-test` LXD container for test deployment
@@ -534,7 +570,9 @@ sudo lxc config set lab-registry boot.autostart true
 
 ### Registry UI on lab-registry (`http://192.168.1.7:8080`)
 
-![Docker Registry UI](Images/DockerRegistryUI.png)
+| Empty Registry | mywebapi Image Pushed |
+|:---:|:---:|
+| ![Docker Registry UI](Images/DockerRegistryUI.png) | ![mywebapi Pushed](Images/mywebapiImagePushedtoDockerRegsitry_shown_inDockerRegistryUI.jpg) |
 
 ---
 
